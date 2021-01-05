@@ -1,13 +1,11 @@
 const express = require("express");
 const router = express.Router();
-// const account_dao = require("../../../daos/account.dao");
 const auth = require("../../middleware/auth.middleware");
 const crypto = require('crypto');
-// const de = require("./../../../common-encrypt-decrypt/de");
-// const contants = require('./../../../contants/contants');
+const { check, validationResult } = require("express-validator");
 
 
-router.get("/", async (req, res) => {
+router.get("/", async(req, res) => {
     try {
         const accounts = await account_dao.findAllAccount();
         res.json(accounts);
@@ -17,7 +15,70 @@ router.get("/", async (req, res) => {
     }
 });
 
-router.get("/:id", async (req, res) => {
+/* ----- 
+  @route  POST api/auth
+  @desc   Authenticate user & get token
+-----*/
+router.post(
+    "/login", [
+        // check("email", "Please include a valid email").isEmail(),
+        check(
+            "password",
+            "Please enter a password with 6 or more character"
+        ).exists()
+    ],
+    async(req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({
+                errors: errors.array()
+            });
+        }
+
+        const { storeDomain, password } = req.body;
+        var passwordEncrypt = CryptoJS.SHA256(password);
+        try {
+            console.log(req.body);
+            let account = await Account.findOne({
+                where: {
+                    store_domain: storeDomain,
+                    password: passwordEncrypt.toString()
+                }
+            });
+
+            if (!account) {
+                return res
+                    .status(400)
+                    .json({ errors: [{ message: "Invalid email or password" }] });
+            }
+            // const isMatch = await bcrypt.compare(password, user.password);
+            // if (!isMatch) {
+            //     return res.status(400).json({ errors: [{ message: 'Invalid email or password' }] })
+            // }
+            const payload = {
+                account: {
+                    id: account.id
+                }
+            };
+            jwt.sign(
+                payload,
+                config.get("jwtSecret"), { expiresIn: 3600000000000 },
+                (err, token) => {
+                    if (err) throw err;
+                    res.json({
+                        token,
+                        account
+                    });
+                }
+            );
+        } catch (err) {
+            console.error(err.message);
+            res.status(500).send("Server error");
+        }
+    }
+);
+
+router.get("/:id", async(req, res) => {
     const id = req.params.id;
     try {
         const key = crypto.randomBytes(32);
@@ -34,7 +95,7 @@ router.get("/:id", async (req, res) => {
     }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", async(req, res) => {
     var newAccount = req.body;
     console.log(newAccount);
     try {
@@ -56,7 +117,7 @@ router.post("/", async (req, res) => {
     }
 });
 
-router.put("/", async (req, res) => {
+router.put("/", async(req, res) => {
     var account = req.body;
     var account_id = req.body.id;
     console.log(account);
@@ -81,7 +142,7 @@ router.put("/", async (req, res) => {
     }
 });
 
-router.put("/delete", async (req, res) => {
+router.put("/delete", async(req, res) => {
     const id = req.body.id;
     const account = req.body;
     try {
@@ -105,7 +166,7 @@ router.put("/delete", async (req, res) => {
     }
 });
 //change password
-router.put("/changePassword", async (req, res) => {
+router.put("/changePassword", async(req, res) => {
     var passAndOTP = req.body;
     try {
         var result = await account_dao.changePassword(passAndOTP);
